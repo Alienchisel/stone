@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.5"
+VERSION="0.6"
 
 show_help() {
 cat << EOF
@@ -37,6 +37,13 @@ case "${1:-}" in
     --version)
         echo "tools-update $VERSION"
         exit 0
+        ;;
+    "")
+        ;;
+    *)
+        echo "Error: Unknown option '$1'"
+        echo "Use --help for usage information."
+        exit 1
         ;;
 esac
 
