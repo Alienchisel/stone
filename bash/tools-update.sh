@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-LINPEAS_PATH="/home/pentestlich/tools/exploitation/post-exploitation/linux/linpeas.sh"
-WINPEAS64_PATH="/home/pentestlich/tools/exploitation/post-exploitation/windows/winPEASx64.exe"
-WINPEAS86_PATH="/home/pentestlich/tools/exploitation/post-exploitation/windows/winPEASx86.exe"
+LINUX_POST_DIR="/home/pentestlich/tools/exploitation/post-exploitation/linux"
+WINDOWS_POST_DIR="/home/pentestlich/tools/exploitation/post-exploitation/windows"
 
 TMP_DIR="$(mktemp -d)"
 
@@ -13,28 +12,46 @@ cleanup() {
 
 trap cleanup EXIT
 
-echo "[+] Updating PEAS tools..."
+download_tool() {
+    local name="$1"
+    local url="$2"
+    local dest="$3"
 
-echo "[+] Downloading linPEAS..."
-curl -L \
+    echo "[+] Downloading $name..."
+    curl -L "$url" -o "$TMP_DIR/$name"
+    mv "$TMP_DIR/$name" "$dest"
+}
+
+make_executable() {
+    local path="$1"
+    chmod 755 "$path"
+}
+
+echo "[+] Updating exploitation tools..."
+
+# Post-exploitation: Linux
+download_tool \
+    "linpeas.sh" \
     "https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh" \
-    -o "$TMP_DIR/linpeas.sh"
+    "$LINUX_POST_DIR/linpeas.sh"
 
-echo "[+] Downloading winPEAS x64..."
-curl -L \
+download_tool \
+    "lse.sh" \
+    "https://github.com/diego-treitos/linux-smart-enumeration/releases/latest/download/lse.sh" \
+    "$LINUX_POST_DIR/lse.sh"
+
+make_executable "$LINUX_POST_DIR/linpeas.sh"
+make_executable "$LINUX_POST_DIR/lse.sh"
+
+# Post-exploitation: Windows
+download_tool \
+    "winPEASx64.exe" \
     "https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEASx64.exe" \
-    -o "$TMP_DIR/winPEASx64.exe"
+    "$WINDOWS_POST_DIR/winPEASx64.exe"
 
-echo "[+] Downloading winPEAS x86..."
-curl -L \
+download_tool \
+    "winPEASx86.exe" \
     "https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEASx86.exe" \
-    -o "$TMP_DIR/winPEASx86.exe"
+    "$WINDOWS_POST_DIR/winPEASx86.exe"
 
-echo "[+] Replacing local files..."
-mv "$TMP_DIR/linpeas.sh" "$LINPEAS_PATH"
-mv "$TMP_DIR/winPEASx64.exe" "$WINPEAS64_PATH"
-mv "$TMP_DIR/winPEASx86.exe" "$WINPEAS86_PATH"
-
-chmod 755 "$LINPEAS_PATH"
-
-echo "[+] Done. linPEAS and winPEAS have been updated."
+echo "[+] Done. Exploitation tools have been updated."
