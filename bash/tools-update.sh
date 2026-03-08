@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+VERSION="0.4"
+
+if [[ "${1:-}" == "--version" ]]; then
+    echo "tools-update $VERSION"
+    exit 0
+fi
+
 LINUX_POST_DIR="/home/pentestlich/tools/exploitation/post-exploitation/linux"
 WINDOWS_POST_DIR="/home/pentestlich/tools/exploitation/post-exploitation/windows"
 PRE_EXPLOITATION_DIR="/home/pentestlich/tools/exploitation/pre-exploitation"
