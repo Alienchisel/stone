@@ -1,3 +1,5 @@
-# linux-automation
+A collection of stable, personal command-line tools.
 
-A personal collection of small Linux automation scripts.
+These scripts are intended to be reliable, reusable, and part of a long-term toolkit.
+
+Scripts are symlinked into ~/bin for direct use.
