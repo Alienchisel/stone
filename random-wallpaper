@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# random-wallpaper
+# Randomly selects a wallpaper from WALL_DIR (non-repeating) and applies it to all XFCE desktops.
+
 set -euo pipefail
 
 WALL_DIR="$HOME/Pictures/wallpapers/piranesi/processed"
