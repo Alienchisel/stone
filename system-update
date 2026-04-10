@@ -1,19 +1,52 @@
 #!/usr/bin/env bash
-set -e
+# system-update - updates package lists, performs a full upgrade, and cleans
+# up unused packages and cached files. Intended for Kali Linux (apt).
+# Requires: apt, sudo
+
+show_help() {
+    cat <<'EOF'
+Usage: system-update [-h|--help]
+
+Updates package lists, performs a full upgrade, and cleans up unused
+packages and cached files. Intended for Kali Linux (apt).
+
+Steps performed:
+  1. apt update          Refresh package lists
+  2. apt full-upgrade    Upgrade all packages (recommended for Kali)
+  3. apt autoremove      Remove unused packages and their configs
+  4. apt autoclean       Remove outdated cached package files
+  5. apt clean           Clear the full package cache
+
+Requires: apt, sudo
+EOF
+}
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && show_help && exit 0
+
+# Dependency check
+for cmd in apt sudo; do
+    command -v "$cmd" &>/dev/null || { echo "Error: '$cmd' not found."; exit 1; }
+done
+
+set -euo pipefail
 
 echo "==> Starting system update and cleanup..."
 
-# Update package lists
+# Refresh package lists
 sudo apt update
 
-# Upgrade all packages (recommended for Kali)
+# Full upgrade — recommended over apt upgrade on Kali as it handles
+# dependency changes and package replacements more aggressively
 sudo apt full-upgrade -y
 
-# Remove unused packages and configs
+# Remove unused packages and their residual config files
 sudo apt autoremove --purge -y
 
-# Clean cached package files
+# Remove cached packages that are no longer available in the repositories
 sudo apt autoclean -y
+
+# Clear the entire local package cache
 sudo apt clean
 
 echo "==> System update and cleanup completed successfully."
+

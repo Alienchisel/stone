@@ -1,13 +1,27 @@
 #!/usr/bin/env bash
+# history-backup - creates a timestamped backup of the shell history file.
+# Backups are saved to ~/history_backups/.
+# Requires: cp, date, mkdir
 
-# Simple backup of shell history file
+# Dependency check
+for cmd in cp date mkdir; do
+    command -v "$cmd" &>/dev/null || { echo "Error: '$cmd' not found."; exit 1; }
+done
 
+# History file — defaults to ~/.zsh_history if HISTFILE is not set
 HISTFILE="${HISTFILE:-$HOME/.zsh_history}"
-DEST="$HOME/history_backups"
 
+# Validate history file exists and is readable
+[[ -f "$HISTFILE" ]]  || { echo "Error: History file not found: '$HISTFILE'."; exit 1; }
+[[ -r "$HISTFILE" ]]  || { echo "Error: History file not readable: '$HISTFILE'."; exit 1; }
+
+# Backup destination directory
+DEST="$HOME/history_backups"
 mkdir -p "$DEST"
 
+# Timestamped backup filename
 ts="$(date +'%Y-%m-%d_%H-%M-%S')"
-cp "$HISTFILE" "$DEST/history_$ts.txt"
+backup="$DEST/history_$ts.txt"
 
-echo "History backed up to $DEST"
+cp "$HISTFILE" "$backup"
+echo "Backed up: $HISTFILE → $backup"

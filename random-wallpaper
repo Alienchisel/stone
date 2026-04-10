@@ -1,50 +1,120 @@
 #!/usr/bin/env bash
+# random-wallpaper - randomly selects a wallpaper matching the current screen
+# mode and applies it to all XFCE desktops without a screen flash.
+#
+# Requires: xrandr, xfconf-query, xfdesktop, find
 
-# random-wallpaper
-# Randomly selects a wallpaper from WALL_DIR (non-repeating) and applies it to all XFCE desktops.
+show_help() {
+    cat <<'EOF'
+Usage: random-wallpaper [-h|--help]
+
+Randomly selects a wallpaper from the configured directory that matches the
+current screen mode, and applies it to all XFCE desktops.
+
+The previously shown wallpaper is remembered separately for each wallpaper
+class to avoid immediate repeats.
+
+Settings (edit in script):
+  WALL_DIR         Wallpaper source directory
+                   (default: ~/Pictures/wallpapers/piranesi/processed)
+  LAST_DIR         Cache directory storing last-used wallpaper paths
+                   per wallpaper class
+                   (default: ~/.cache/random-wallpaper)
+
+Wallpaper classes:
+  - wide  -> 5120x1336
+  - half  -> 2558x1335
+
+Filename expectation:
+  Wallpapers should end with:
+    _WIDTHxHEIGHT.jpg
+  Example:
+    arch_skeletons_nero_gallery_5120x1336.jpg
+EOF
+}
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && show_help && exit 0
 
 set -euo pipefail
 
-WALL_DIR="$HOME/Pictures/wallpapers/piranesi/processed"
-LAST_FILE="$HOME/.cache/last_wallpaper"
+for cmd in xrandr xfconf-query xfdesktop find awk; do
+    command -v "$cmd" &>/dev/null || {
+        printf "Error: '%s' not found.\n" "$cmd" >&2
+        exit 1
+    }
+done
 
-mkdir -p "$(dirname "$LAST_FILE")"
+WALL_DIR="$HOME/Pictures/wallpapers/piranesi/processed"
+LAST_DIR="$HOME/.cache/random-wallpaper"
+
+mkdir -p "$LAST_DIR"
+
+detected_resolution="$(xrandr | awk '/\*/ { print $1; exit }')"
+[[ -n "$detected_resolution" ]] || {
+    printf 'Error: could not detect current resolution from xrandr.\n' >&2
+    exit 1
+}
+
+detected_width="${detected_resolution%x*}"
+detected_height="${detected_resolution#*x}"
+
+[[ "$detected_width" =~ ^[0-9]+$ && "$detected_height" =~ ^[0-9]+$ ]] || {
+    printf 'Error: failed to parse detected resolution: %s\n' "$detected_resolution" >&2
+    exit 1
+}
+
+# Normalize the detected resolution to one of your curated wallpaper targets.
+# This avoids failure when the half-screen tiled size is slightly different
+# from the generated wallpaper size, e.g. 2565x1335 vs 2558x1335.
+if (( detected_width >= 4000 )); then
+    mode="wide"
+    target_resolution="5120x1336"
+else
+    mode="half"
+    target_resolution="2558x1335"
+fi
+
+suffix="_${target_resolution}"
+LAST_FILE="$LAST_DIR/last_wallpaper_${mode}"
 
 mapfile -d '' files < <(
-  find "$WALL_DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) -print0
+    find "$WALL_DIR" -type f -name "*${suffix}.jpg" -print0
 )
 
 count=${#files[@]}
 
 if (( count == 0 )); then
-  printf 'No wallpapers found in: %s\n' "$WALL_DIR" >&2
-  exit 1
+    printf 'No wallpapers found in: %s matching target resolution %s (detected %s)\n' \
+        "$WALL_DIR" "$target_resolution" "$detected_resolution" >&2
+    exit 1
 fi
 
 if (( count == 1 )); then
-  file="${files[0]}"
+    file="${files[0]}"
 else
-  last=""
-  [[ -f "$LAST_FILE" ]] && last=$(<"$LAST_FILE")
+    last=""
+    [[ -f "$LAST_FILE" ]] && last=$(<"$LAST_FILE")
 
-  while :; do
-    file="${files[RANDOM % count]}"
-    [[ "$file" != "$last" ]] && break
-  done
+    while :; do
+        file="${files[RANDOM % count]}"
+        [[ "$file" != "$last" ]] && break
+    done
 fi
 
 xfconf-query -c xfce4-desktop -l |
 while IFS= read -r prop; do
-  case "$prop" in
-    */image-path|*/last-image)
-      xfconf-query -c xfce4-desktop -p "$prop" -s "$file" 2>/dev/null || true
-      ;;
-  esac
+    case "$prop" in
+        */image-path|*/last-image)
+            xfconf-query -c xfce4-desktop -p "$prop" -s "$file" 2>/dev/null || true
+            ;;
+    esac
 done
+
+xfdesktop --reload 2>/dev/null || true
 
 printf '%s\n' "$file" > "$LAST_FILE"
 
-pkill xfdesktop 2>/dev/null || true
-xfdesktop >/dev/null 2>&1 &
-
-printf 'Wallpaper set to: %s\n' "$file"
+printf 'Detected resolution: %s\n' "$detected_resolution"
+printf 'Wallpaper class:    %s\n' "$mode"
+printf 'Target resolution:  %s\n' "$target_resolution"
+printf 'Wallpaper set to:   %s\n' "$file"

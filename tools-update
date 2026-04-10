@@ -1,34 +1,47 @@
 #!/usr/bin/env bash
+# tools-update - downloads and updates selected exploitation tools.
+# Covers Linux/Windows post-exploitation binaries and pre-exploitation git repos.
+# Requires: curl, git, chmod
+
 set -euo pipefail
 
 VERSION="0.6"
 
 show_help() {
-cat << EOF
-tools-update $VERSION
+    cat <<EOF
+Usage: tools-update [OPTIONS]
 
-Updates selected exploitation tools.
+Downloads and updates selected exploitation tools.
+Version: $VERSION
 
-Usage:
-  tools-update [OPTIONS]
+Tools updated:
+  Post-exploitation (Linux):
+    linpeas.sh       Linux privilege escalation auditing tool (PEASS-ng)
+    lse.sh           Linux Smart Enumeration
+
+  Post-exploitation (Windows):
+    winPEASx64.exe   Windows privilege escalation auditing tool, 64-bit (PEASS-ng)
+    winPEASx86.exe   Windows privilege escalation auditing tool, 32-bit (PEASS-ng)
+
+  Pre-exploitation:
+    enum4linux        SMB/Samba enumeration tool (git pull)
 
 Options:
   -h, --help       Show this help message and exit
       --version    Show script version and exit
 
 Examples:
-  tools-update
-      Update all configured tools.
+  tools-update             Update all configured tools
+  tools-update --version   Display the current script version
+  tools-update --help      Show this help message
 
-  tools-update --version
-      Display the current version of the script.
-
-  tools-update --help
-      Show this help message.
+Requires: curl, git, chmod
 EOF
 }
 
+# ------------------------
 # Argument handling
+# ------------------------
 case "${1:-}" in
     -h|--help)
         show_help
@@ -39,6 +52,7 @@ case "${1:-}" in
         exit 0
         ;;
     "")
+        # No arguments — proceed with update
         ;;
     *)
         echo "Error: Unknown option '$1'"
@@ -47,44 +61,66 @@ case "${1:-}" in
         ;;
 esac
 
-LINUX_POST_DIR="/home/pentestlich/tools/exploitation/post-exploitation/linux"
-WINDOWS_POST_DIR="/home/pentestlich/tools/exploitation/post-exploitation/windows"
-PRE_EXPLOITATION_DIR="/home/pentestlich/tools/exploitation/pre-exploitation"
+# ------------------------
+# Dependency check
+# ------------------------
+for cmd in curl git chmod; do
+    command -v "$cmd" &>/dev/null || { echo "Error: '$cmd' not found."; exit 1; }
+done
 
+# ------------------------
+# Tool directories
+# Use $HOME instead of hardcoded /home/pentestlich for portability
+# ------------------------
+LINUX_POST_DIR="$HOME/tools/exploitation/post-exploitation/linux"
+WINDOWS_POST_DIR="$HOME/tools/exploitation/post-exploitation/windows"
+PRE_EXPLOITATION_DIR="$HOME/tools/exploitation/pre-exploitation"
+
+# Validate that all tool directories exist before proceeding
+for dir in "$LINUX_POST_DIR" "$WINDOWS_POST_DIR" "$PRE_EXPLOITATION_DIR"; do
+    [[ -d "$dir" ]] || { echo "Error: Directory not found: '$dir'"; exit 1; }
+done
+
+# ------------------------
+# Temporary directory — cleaned up automatically on exit
+# ------------------------
 TMP_DIR="$(mktemp -d)"
-
-cleanup() {
-    rm -rf "$TMP_DIR"
-}
-
+cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 
+# ------------------------
+# Helper: download a tool to a temp file then move it into place.
+# Using a temp file prevents partial downloads from corrupting the destination.
+# ------------------------
 download_tool() {
     local name="$1"
     local url="$2"
     local dest="$3"
-
     echo "[+] Downloading $name..."
     curl -fsSL "$url" -o "$TMP_DIR/$name"
     mv "$TMP_DIR/$name" "$dest"
 }
 
+# Helper: set standard executable permissions on a file
 make_executable() {
-    local path="$1"
-    chmod 755 "$path"
+    chmod 755 "$1"
 }
 
+# Helper: pull latest commits for a git repo using fast-forward only,
+# avoiding accidental merges if the remote history has diverged
 update_git_repo() {
     local name="$1"
     local repo_path="$2"
-
     echo "[+] Updating $name..."
     git -C "$repo_path" pull --ff-only
 }
 
+# ------------------------
+# Run updates
+# ------------------------
 echo "[+] Updating exploitation tools..."
 
-# Post-exploitation: Linux
+# --- Post-exploitation: Linux ---
 download_tool \
     "linpeas.sh" \
     "https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh" \
@@ -98,7 +134,7 @@ download_tool \
 make_executable "$LINUX_POST_DIR/linpeas.sh"
 make_executable "$LINUX_POST_DIR/lse.sh"
 
-# Post-exploitation: Windows
+# --- Post-exploitation: Windows ---
 download_tool \
     "winPEASx64.exe" \
     "https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEASx64.exe" \
@@ -109,7 +145,7 @@ download_tool \
     "https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEASx86.exe" \
     "$WINDOWS_POST_DIR/winPEASx86.exe"
 
-# Pre-exploitation
+# --- Pre-exploitation ---
 update_git_repo \
     "enum4linux" \
     "$PRE_EXPLOITATION_DIR/enum4linux"
